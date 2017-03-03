@@ -1,8 +1,7 @@
 #pragma config(I2C_Usage, I2C1, i2cSensors)
-#pragma config(Sensor, dgtl1,  rightEncoder,   sensorQuadEncoder)
-#pragma config(Sensor, dgtl3,  leftEncoder,    sensorQuadEncoder)
+#pragma config(Sensor, dgtl1,  rightDriveEncoder, sensorQuadEncoder)
+#pragma config(Sensor, dgtl3,  leftDriveEncoder, sensorQuadEncoder)
 #pragma config(Sensor, dgtl5,  pClaw,          sensorDigitalOut)
-#pragma config(Sensor, dgtl6,  ,               sensorTouch)
 #pragma config(Sensor, I2C_1,  rightLiftEncoder, sensorQuadEncoderOnI2CPort,    , AutoAssign )
 #pragma config(Motor,  port2,           driveOuterRight, tmotorVex393TurboSpeed_MC29, openLoop, reversed)
 #pragma config(Motor,  port3,           driveInnerRight, tmotorVex393TurboSpeed_MC29, openLoop)
@@ -29,6 +28,111 @@
 //Main competition background code...do not modify!
 #include "Vex_Competition_Includes.c"
 
+/*---------------------------------------------------------------------------*/
+/*                                                                           */
+/*        												Drive PID																	 */
+/*                                                                           */
+/*---------------------------------------------------------------------------*/
+
+#define wheelDiameter  	 	4.0    // Inches.
+#define ticksPerRev    	 	360.0  // Quadrature Encoder.
+#define driveDiameter    	11.5   // Inches.
+
+#define inchesToTicks(x) 	((x) * (ticksPerRev / (PI * wheelDiameter)))
+#define degreesToTicks(x)	inchesToTicks((x) * ((driveDiameter / 2.0) * (PI / 180.0)))
+
+short trueSpeed(short speed) {
+	if (speed == 0) {
+		return 0;
+	}
+	short x = abs(speed);
+
+	if (x > 127) {
+		x = 127;
+	}
+	return sgn(speed) * ((((0.000001115136722 * x - 0.0001834554708) * x
+			+ 0.01010261354) * x + 0.01924469053) * x + 11.46841392);
+}
+
+void drive(int maxPower, int encoderTicks, int turnValue) {
+	const float Kp = .95;
+	const float Kd = 10.0;
+	const float correctionKp = 2.0;
+	const int thresholdTicks = 15;
+	const long durationMs = 250;
+
+	int lastError;
+	int lastTime = nSysTime;
+	int lastTimeOutside = nSysTime;  // Stores last nSysTime where abs(error) was > thresholdTicks.
+	int rightEncoder, leftEncoder, dt, error, correctionPower, rightPower, leftPower;
+	float derivative;
+
+	// Save encoder values.
+	int initialEncoderR = SensorValue[dgtl1];
+	int initialEncoderL = SensorValue[dgtl3];
+
+	while (true) {
+		rightEncoder = SensorValue[dgtl1] - initialEncoderR;
+		leftEncoder = turnValue * (SensorValue[dgtl3] - initialEncoderL);
+		dt = nSysTime - lastTime;
+
+		error = encoderTicks - (sgn(maxPower) * (rightEncoder + leftEncoder) / 2);
+		derivative = (dt == 0) ? 0.0 : (float)(error - lastError) / dt;
+
+		correctionPower = correctionKp * (rightEncoder - leftEncoder);
+		rightPower = Kp * error + Kd * derivative - correctionPower;
+		if (abs(rightPower) > abs(maxPower)) {
+			rightPower = sgn(rightPower) * abs(maxPower);
+		}
+		// Normalize left and right power to ensure full use of correctionPower.
+		leftPower = turnValue * (rightPower + 2 * correctionPower);
+		if (abs(leftPower) > abs(maxPower)) {
+			leftPower = sgn(leftPower) * abs(maxPower);
+		}
+		rightPower = turnValue * leftPower - 2 * correctionPower;
+		if (abs(rightPower) > abs(maxPower)) {
+			rightPower = sgn(rightPower) * abs(maxPower);
+		}
+		motor[driveOuterRight] = motor[driveInnerRight] = rightPower;
+		motor[driveOuterLeft] = motor[driveInnerLeft] = leftPower;
+
+		// Handle exiting when error is small enough for long enough.
+		if (abs(error) < thresholdTicks) {
+			if (nSysTime - lastTimeOutside > durationMs) {
+				break;  // Stop driving and exit.
+			}
+		} else {
+			lastTimeOutside = nSysTime;
+		}
+		lastTime += dt;
+		lastError = error;
+
+		sleep(15);
+	}
+	motor[driveOuterRight] = motor[driveInnerRight] = motor[driveOuterLeft] = motor[driveInnerLeft] = 0;
+}
+
+void driveForward(int power, float inches) {
+	drive(abs(power), inchesToTicks(abs(inches)), 1);
+}
+
+void driveBackward(int power, float inches) {
+	drive(-abs(power), inchesToTicks(abs(inches)), 1);
+}
+
+void turnRight(int power, float degrees) {
+	drive(-abs(power), degreesToTicks(abs(degrees)), -1);
+}
+
+void turnLeft(int power, float degrees) {
+	drive(abs(power), degreesToTicks(abs(degrees)), -1);
+}
+
+/*---------------------------------------------------------------------------*/
+/*                                                                           */
+/*        												Lift PID																	 */
+/*                                                                           */
+/*---------------------------------------------------------------------------*/
 
 bool isAutonomous = false;
 int liftTargetPosition = 0;
@@ -139,6 +243,10 @@ void pre_auton()
 task autonomous()
 {
 	isAutonomous = true;
+	SensorValue[rightDriveEncoder] = SensorValue[leftDriveEncoder] = 0;
+	wait1Msec(20);
+	driveForward(40, 25);
+	turnLeft(50, 85);
 }
 
 
