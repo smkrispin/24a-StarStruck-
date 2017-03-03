@@ -48,14 +48,6 @@ task lift()
 			motor[liftInnerLeft] = -127;
 		}
 
-		else if(nMotorEncoder[liftOuterRight] < 50)
-		{
-			motor[liftInnerRight] = -10;
-			motor[liftOuterRight] = -10;
-			motor[liftOuterLeft] = -10;
-			motor[liftInnerLeft] = -10;
-		}
-
 		else
 		{
 			motor[liftInnerRight] = 0;
