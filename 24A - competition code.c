@@ -39,19 +39,26 @@ task lift()
 {
 	nMotorEncoder[liftOuterRight] = 0;
 	liftTargetPosition = nMotorEncoder[liftOuterRight];
+	int liftMotorPower = 0;
 	while(true)
 	{
 			if(vexRT[Btn6U] == 1)
 		{
-			liftTargetPosition = -10000; //ensure that lift target won't be set until after either 6U or 6D is released
-			motor[liftInnerRight] = motor[liftOuterRight] = motor[liftOuterLeft] = motor[liftInnerLeft] = -127;
+			if (liftTargetPosition != -10000) {
+				liftTargetPosition = -10000; //ensure that lift target won't be set until after either 6U or 6D is released
+				liftMotorPower = -127;
+			}
+			motor[liftInnerRight] = motor[liftOuterRight] = motor[liftOuterLeft] = motor[liftInnerLeft] = liftMotorPower;
 
 		}
 
 		else if(vexRT[Btn6D] == 1)
 		{
-			liftTargetPosition = -10000;
-			motor[liftInnerRight] = motor[liftOuterRight] = motor[liftOuterLeft] = motor[liftInnerLeft] = 127;
+			if (liftTargetPosition != -10000) {
+				liftTargetPosition = -10000; //ensure that lift target won't be set until after either 6U or 6D is released
+				liftMotorPower = 127;
+			}
+			motor[liftInnerRight] = motor[liftOuterRight] = motor[liftOuterLeft] = motor[liftInnerLeft] = liftMotorPower;
 
 		}
 
@@ -59,9 +66,21 @@ task lift()
 		{
 			if(liftTargetPosition == -10000)
 				{
-					motor[liftInnerRight] = motor[liftOuterRight] = motor[liftOuterLeft] = motor[liftInnerLeft] = 0;
-					liftTargetPosition = nMotorEncoder[liftOuterRight];
-				//	liftTargetPosition = liftTargetPosition; //add additional tics difference to get the actual encoder value
+					liftTargetPosition = nMotorEncoder[liftOuterRight]; //set lifttarget to encoder value
+
+						if(liftMotorPower >= 0)
+					{
+						motor[liftInnerRight] = motor[liftOuterRight] = motor[liftOuterLeft] = motor[liftInnerLeft] = 0;
+					}
+					else {
+						while(liftMotorPower < -80)
+						{
+							wait1Msec(10);
+							motor[liftInnerRight] = motor[liftOuterRight] = motor[liftOuterLeft] = motor[liftInnerLeft] = liftMotorPower;
+							liftMotorPower += 10;
+
+						}
+					}
 				}
 
 			//liftCurrentPosition = nMotorEncoder[liftOuterRight] - 30;
@@ -76,7 +95,17 @@ task lift()
 				}
 				else
 					{
-						motor[liftInnerRight] = motor[liftOuterRight] = motor[liftOuterLeft] = motor[liftInnerLeft] = 0;
+					if(liftTargetPosition > 50)
+						{
+							motor[liftInnerRight] = motor[liftOuterRight] = motor[liftOuterLeft] = motor[liftInnerLeft] = -22;
+						}
+						else {
+							motor[liftInnerRight] = motor[liftOuterRight] = motor[liftOuterLeft] = motor[liftInnerLeft] = 2;
+							if(nMotorEncoder[liftOuterRight] != 0)
+							{
+								nMotorEncoder[liftOuterRight] = 0;
+							}
+						}
 					}
 		}
 
