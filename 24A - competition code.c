@@ -95,16 +95,13 @@ task lift()
 				}
 				else
 					{
-					if(liftTargetPosition > 50)
+					if(liftTargetPosition > 65)
 						{
 							motor[liftInnerRight] = motor[liftOuterRight] = motor[liftOuterLeft] = motor[liftInnerLeft] = -22;
 						}
 						else {
 							motor[liftInnerRight] = motor[liftOuterRight] = motor[liftOuterLeft] = motor[liftInnerLeft] = 2;
-							if(nMotorEncoder[liftOuterRight] != 0)
-							{
-								nMotorEncoder[liftOuterRight] = 0;
-							}
+							nMotorEncoder[liftOuterRight] = 0;
 						}
 					}
 		}
