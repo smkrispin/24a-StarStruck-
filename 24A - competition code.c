@@ -55,7 +55,7 @@ short trueSpeed(short speed) {
 }
 
 void drive(int maxPower, int encoderTicks, int turnValue) {
-	const float Kp = .95;
+	const float Kp = 0.95;
 	const float Kd = 10.0;
 	const float correctionKp = 2.0;
 	const int thresholdTicks = 15;
@@ -117,11 +117,11 @@ void driveForward(int power, float inches) {
 }
 
 void driveBackward(int power, float inches) {
-	drive(-abs(power), inchesToTicks(abs(inches)), 1);
+	drive(abs(power), inchesToTicks(-abs(inches)), 1);
 }
 
 void turnRight(int power, float degrees) {
-	drive(-abs(power), degreesToTicks(abs(degrees)), -1);
+	drive(abs(power), degreesToTicks(-abs(degrees)), -1);
 }
 
 void turnLeft(int power, float degrees) {
@@ -134,83 +134,163 @@ void turnLeft(int power, float degrees) {
 /*                                                                           */
 /*---------------------------------------------------------------------------*/
 
-bool isAutonomous = false;
+int liftTarget;
 int liftTargetPosition = 0;
 int liftHoldPower;
 int liftCurrentPosition = 0; // used for debugging
+int liftMotorPower = 0;
 
-task lift()
+task liftUserControl()
 {
 	nMotorEncoder[liftOuterRight] = 0;
 	liftTargetPosition = nMotorEncoder[liftOuterRight];
-	int liftMotorPower = 0;
 	while(true)
 	{
-			if(vexRT[Btn6U] == 1) //if lift up button is pressed the do the following
-		{
-			if (liftTargetPosition != -10000) {
-				liftTargetPosition = -10000; //ensure that lift target won't be set until after either 6U or 6D is released
-				liftMotorPower = -127; //set lift power
-			}
-			motor[liftInnerRight] = motor[liftOuterRight] = motor[liftOuterLeft] = motor[liftInnerLeft] = liftMotorPower;
-
-		}
-
-		else if(vexRT[Btn6D] == 1) //if lift down button is pressed the do the following
-		{
-			if (liftTargetPosition != -10000) {
-				liftTargetPosition = -10000; //ensure that lift target won't be set until after either 6U or 6D is released
-				liftMotorPower = 127;
-			}
-			motor[liftInnerRight] = motor[liftOuterRight] = motor[liftOuterLeft] = motor[liftInnerLeft] = liftMotorPower;
-
-		}
-
-		else
-		{
-			if(liftTargetPosition == -10000)
-				{
-					liftTargetPosition = nMotorEncoder[liftOuterRight]; //set lifttarget to encoder value
-
-						if(liftMotorPower >= 0)
+					if(vexRT[Btn6U] == 1) //if lift up button is pressed the do the following
 					{
-						motor[liftInnerRight] = motor[liftOuterRight] = motor[liftOuterLeft] = motor[liftInnerLeft] = 0;
-					}
-					else {
-						while(liftMotorPower < -80)
-						{
-							wait1Msec(10);
-							motor[liftInnerRight] = motor[liftOuterRight] = motor[liftOuterLeft] = motor[liftInnerLeft] = liftMotorPower; //bring motor power to a gradual stop
-							liftMotorPower += 10;
-
+						if (liftTargetPosition != -10000) {
+							liftTargetPosition = -10000; //ensure that lift target won't be set until after either 6U or 6D is released
+							liftMotorPower = -127; //set lift power
 						}
+						motor[liftInnerRight] = motor[liftOuterRight] = motor[liftOuterLeft] = motor[liftInnerLeft] = liftMotorPower;
+
 					}
-				}
 
-			if(abs(liftTargetPosition - nMotorEncoder[liftOuterRight]) > 35) //set a tolerance to romove uncessecary oscillation
+				else if(vexRT[Btn6D] == 1) //if lift down button is pressed the do the following
 				{
-					liftHoldPower = (liftTargetPosition - nMotorEncoder[liftOuterRight]) / 2; //find the error and scale
+					if (liftTargetPosition != -10000) {
+						liftTargetPosition = -10000; //ensure that lift target won't be set until after either 6U or 6D is released
+						liftMotorPower = 127;
+					}
+					motor[liftInnerRight] = motor[liftOuterRight] = motor[liftOuterLeft] = motor[liftInnerLeft] = liftMotorPower;
 
-					motor[liftOuterRight] = motor[liftOuterLeft] = motor[liftInnerRight] = motor[liftInnerLeft] = -liftHoldPower; //correct for error
-
-					wait1Msec(20);
 				}
+
 				else
-					{
-					if(liftTargetPosition > 65)
+				{
+					if(liftTargetPosition == -10000)
 						{
-							motor[liftInnerRight] = motor[liftOuterRight] = motor[liftOuterLeft] = motor[liftInnerLeft] = -22; //if error is inside of tolerance set motor power to 22
+							liftTargetPosition = nMotorEncoder[liftOuterRight]; //set lifttarget to encoder value
+
+								if(liftMotorPower >= 0)
+							{
+								motor[liftInnerRight] = motor[liftOuterRight] = motor[liftOuterLeft] = motor[liftInnerLeft] = 0;
+							}
+							else {
+								while(liftMotorPower < -80)
+								{
+									wait1Msec(10);
+									motor[liftInnerRight] = motor[liftOuterRight] = motor[liftOuterLeft] = motor[liftInnerLeft] = liftMotorPower; //bring motor power to a gradual stop
+									liftMotorPower += 10;
+
+								}
+							}
+						}
+				{
+					if(abs(liftTargetPosition - nMotorEncoder[liftOuterRight]) > 35 && nMotorEncoder[liftOuterRight] > 50) //set a tolerance to romove uncessecary oscillation
+						{
+							liftHoldPower = (liftTargetPosition - nMotorEncoder[liftOuterRight]) / 2; //find the error and scale
+
+							motor[liftOuterRight] = motor[liftOuterLeft] = motor[liftInnerRight] = motor[liftInnerLeft] = -liftHoldPower; //correct for error
+
+							wait1Msec(20);
+						}
+						else
+							{
+							if(liftTargetPosition > 65 && nMotorEncoder[liftOuterRight] > 50)
+								{
+									motor[liftInnerRight] = motor[liftOuterRight] = motor[liftOuterLeft] = motor[liftInnerLeft] = -22; //if error is inside of tolerance set motor power to 22
+								}
+								else {
+									motor[liftInnerRight] = motor[liftOuterRight] = motor[liftOuterLeft] = motor[liftInnerLeft] = 2; //if lift is down set a hold power and reset encoder to maintain acceracy
+									nMotorEncoder[liftOuterRight] = 0;
+								}
+							}
+				}
+			}
+				wait1Msec(20);
+		}
+}
+
+
+
+task liftAuton()
+	{
+		while(true) {
+
+					if(liftTarget > 0 && nMotorEncoder[liftOuterRight] < liftTarget) //if lift up button is pressed the do the following
+					{
+						if (liftTargetPosition != -10000) {
+							liftTargetPosition = -10000; //ensure that lift target won't be set until after action is completed
+							liftMotorPower = -127; //set lift power
+						}
+						motor[liftInnerRight] = motor[liftOuterRight] = motor[liftOuterLeft] = motor[liftInnerLeft] = -127;
+
+					}
+
+				else if(liftTarget == 0 && nMotorEncoder[liftOuterRight] > liftTarget) //if lift down button is pressed the do the following
+				{
+					if (liftTargetPosition != -10000) {
+						liftTargetPosition = -10000; //ensure that lift target won't be set until action is completed
+						liftMotorPower = 127;
+					}
+					if(nMotorEncoder[liftOuterRight] > 50)
+						{
+							motor[liftInnerRight] = motor[liftOuterRight] = motor[liftOuterLeft] = motor[liftInnerLeft] = 127;
 						}
 						else {
-							motor[liftInnerRight] = motor[liftOuterRight] = motor[liftOuterLeft] = motor[liftInnerLeft] = 2; //if lift is down set a hold power and reset encoder to maintain acceracy
-							nMotorEncoder[liftOuterRight] = 0;
+							motor[liftInnerRight] = motor[liftOuterRight] = motor[liftOuterLeft] = motor[liftInnerLeft] = 0;
 						}
-					}
+				}
+
+				else
+				{
+					if(liftTargetPosition == -10000)
+						{
+							liftTargetPosition = nMotorEncoder[liftOuterRight]; //set lifttarget to encoder value
+
+								if(liftMotorPower >= 0)
+							{
+								motor[liftInnerRight] = motor[liftOuterRight] = motor[liftOuterLeft] = motor[liftInnerLeft] = 0;
+							}
+							else {
+								while(liftMotorPower < -80)
+								{
+									wait1Msec(10);
+									motor[liftInnerRight] = motor[liftOuterRight] = motor[liftOuterLeft] = motor[liftInnerLeft] = liftMotorPower; //bring motor power to a gradual stop
+									liftMotorPower += 10;
+
+								}
+							}
+						}
+				{
+					if(abs(liftTargetPosition - nMotorEncoder[liftOuterRight]) > 35 && nMotorEncoder[liftOuterRight] > 50) //set a tolerance to romove uncessecary oscillation
+						{
+							liftHoldPower = (liftTargetPosition - nMotorEncoder[liftOuterRight]) / 2; //find the error and scale
+
+							motor[liftOuterRight] = motor[liftOuterLeft] = motor[liftInnerRight] = motor[liftInnerLeft] = -liftHoldPower; //correct for error
+
+							wait1Msec(20);
+						}
+						else
+							{
+							if(liftTargetPosition > 65 && nMotorEncoder[liftOuterRight] > 50)
+								{
+									motor[liftInnerRight] = motor[liftOuterRight] = motor[liftOuterLeft] = motor[liftInnerLeft] = -22; //if error is inside of tolerance set motor power to 22
+								}
+								else {
+									motor[liftInnerRight] = motor[liftOuterRight] = motor[liftOuterLeft] = motor[liftInnerLeft] = 2; //if lift is down set a hold power and reset encoder to maintain acceracy
+									nMotorEncoder[liftOuterRight] = 0;
+								}
+							}
+				}
+			}
+				wait1Msec(20);
+			}
 		}
 
-		wait1Msec(20);
-	}
-}
+	////Autonomous mode////
+
 /*---------------------------------------------------------------------------*/
 /*                          Pre-Autonomous Functions                         */
 /*                                                                           */
@@ -223,7 +303,7 @@ task lift()
 
 void pre_auton()
 {
-	SensorValue[pClaw] = 1;
+	SensorValue[pClaw] = 0;
 }
 
 
@@ -242,11 +322,13 @@ void pre_auton()
 
 task autonomous()
 {
-	isAutonomous = true;
+	stopTask(liftUserControl);
+	startTask(liftAuton);
+
+
 	SensorValue[rightDriveEncoder] = SensorValue[leftDriveEncoder] = 0;
-	wait1Msec(20);
-	driveForward(40, 25);
-	turnLeft(50, 85);
+	driveForward(40, 10);
+
 }
 
 
@@ -262,8 +344,9 @@ task autonomous()
 
 task usercontrol()
 {
-	isAutonomous = false;
-	startTask(lift);
+	stoptask(liftAuton);
+	startTask(liftUserControl);
+
 
 	while(true) {
 	//	int jDifference = vexRT[Ch2] - vexRT[Ch3];
@@ -285,11 +368,6 @@ task usercontrol()
 	      motor[driveInnerRight] = vexRT[Ch2];
 				motor[driveOuterRight] = vexRT[Ch2];
 
-
-		//Lift
-
-
-
 		//Manual Encoder Reset
 
 		if(vexRT[Btn7D] == 1)
@@ -301,12 +379,12 @@ task usercontrol()
 
 		if(vexRT[Btn5U] == 1)
 			{
-      	SensorValue[pClaw] = 1;
+      	SensorValue[pClaw] = 0;
     	}
 
 		else if(vexRT[Btn5D] == 1)
 			{
- 				SensorValue[pClaw] = 0;
+ 				SensorValue[pClaw] = 1;
 			}
 	}
 }
